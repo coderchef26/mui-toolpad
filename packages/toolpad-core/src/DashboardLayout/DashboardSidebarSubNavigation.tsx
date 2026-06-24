@@ -11,7 +11,7 @@ import {
   hasSelectedNavigationChildren,
   isPageItem,
 } from '../shared/navigation';
-import { DashboardSidebarPageItemContext, NavigationContext } from '../shared/context';
+import { DashboardSidebarPageItemContext, FilteredNavigationContext, NavigationContext } from '../shared/context';
 import { getDrawerSxTransitionMixin } from './utils';
 import { useActivePage } from '../useActivePage';
 import {
@@ -32,6 +32,8 @@ interface DashboardSidebarSubNavigationPageItemProps {
   isFullyCollapsed: boolean;
   sidebarExpandedWidth: number | string;
   renderPageItem?: (item: NavigationPageItem, params: { mini: boolean }) => React.ReactNode;
+  /** When true the item is rendered in a visually disabled state (unauthorized). */
+  disabled?: boolean;
 }
 
 /**
@@ -49,6 +51,7 @@ function DashboardSidebarSubNavigationPageItem({
   isFullyCollapsed,
   sidebarExpandedWidth,
   renderPageItem,
+  disabled = false,
 }: DashboardSidebarSubNavigationPageItemProps) {
   const navigationContext = React.useContext(NavigationContext);
 
@@ -66,6 +69,7 @@ function DashboardSidebarSubNavigationPageItem({
     () => ({
       expanded: isExpanded,
       selected: isSelected,
+      disabled,
       id,
       onClick,
       isMini,
@@ -83,6 +87,7 @@ function DashboardSidebarSubNavigationPageItem({
     }),
     [
       depth,
+      disabled,
       id,
       isExpanded,
       isFullyCollapsed,
@@ -124,7 +129,7 @@ interface DashboardSidebarSubNavigationProps {
  * @ignore - internal component.
  */
 function DashboardSidebarSubNavigation({
-  subNavigation,
+  subNavigation: subNavigationProp,
   depth = 0,
   onLinkClick,
   isMini = false,
@@ -136,6 +141,9 @@ function DashboardSidebarSubNavigation({
   renderPageItem,
 }: DashboardSidebarSubNavigationProps) {
   const navigationContext = React.useContext(NavigationContext);
+  // At depth 0 use the pre-filtered navigation (permissions already applied)
+  const filteredNavigationContext = React.useContext(FilteredNavigationContext);
+  const subNavigation = depth === 0 ? filteredNavigationContext : subNavigationProp;
 
   const activePage = useActivePage();
 
@@ -230,6 +238,7 @@ function DashboardSidebarSubNavigation({
         }
 
         const pageItemId = `page-${depth}-${navigationItemIndex}`;
+        const isItemDisabled = !!(navigationItem as NavigationPageItem & { _disabled?: boolean })._disabled;
 
         return (
           <DashboardSidebarSubNavigationPageItem
@@ -245,6 +254,7 @@ function DashboardSidebarSubNavigation({
             isFullyCollapsed={isFullyCollapsed}
             sidebarExpandedWidth={sidebarExpandedWidth}
             renderPageItem={renderPageItem}
+            disabled={isItemDisabled}
           />
         );
       })}
@@ -252,4 +262,6 @@ function DashboardSidebarSubNavigation({
   );
 }
 
-export { DashboardSidebarSubNavigation };
+const MemoizedDashboardSidebarSubNavigation = React.memo(DashboardSidebarSubNavigation);
+MemoizedDashboardSidebarSubNavigation.displayName = 'DashboardSidebarSubNavigation';
+export { MemoizedDashboardSidebarSubNavigation as DashboardSidebarSubNavigation };

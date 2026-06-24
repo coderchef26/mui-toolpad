@@ -53,6 +53,9 @@ const enLabels: LocaleText = {
   deleteSuccessMessage: 'Položka bola úspešne vymazaná.',
   deleteErrorMessage: 'Nepodarilo sa vymazať položku. Dôvod:',
   deletedItemMessage: 'Položka bola úspešne vymazaná.',
+
+  // Permissions
+  accessDeniedMessage: 'Nemáte oprávnenie na prístup k tomuto zdroju.',
 };
 
 export default getLocalization(enLabels);

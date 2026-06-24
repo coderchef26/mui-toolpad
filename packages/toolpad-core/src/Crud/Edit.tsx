@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import invariant from 'invariant';
 import { useNotifications } from '../useNotifications';
-import { CrudContext } from '../shared/context';
+import { CrudContext, PermissionsContext } from '../shared/context';
 import { useLocaleText } from '../AppProvider/LocalizationProvider';
 import { CrudForm, CrudFormSlotProps, CrudFormSlots } from './CrudForm';
 import { DataSourceCache } from './cache';
@@ -247,6 +247,11 @@ function Edit<D extends DataModel>(props: EditProps<D>) {
 
   invariant(dataSource, 'No data source found.');
 
+  // Permission check — guard update operation
+  const { check } = React.useContext(PermissionsContext);
+  const { permissions } = dataSource;
+  const canUpdate = permissions?.update !== undefined ? check(permissions.update) : true;
+
   const cache = React.useMemo(() => {
     const manualCache = dataSourceCache ?? crudContext.dataSourceCache;
     return typeof manualCache !== 'undefined' ? manualCache : new DataSourceCache();
@@ -302,6 +307,15 @@ function Edit<D extends DataModel>(props: EditProps<D>) {
   );
 
   const renderEdit = React.useMemo(() => {
+    if (!canUpdate) {
+      const localeText = { ...CRUD_DEFAULT_LOCALE_TEXT, ...globalLocaleText, ...propsLocaleText };
+      return (
+        <Box sx={{ flexGrow: 1 }}>
+          <Alert severity="error">{localeText.accessDeniedMessage}</Alert>
+        </Box>
+      );
+    }
+
     if (isLoading) {
       return (
         <Box
@@ -341,6 +355,7 @@ function Edit<D extends DataModel>(props: EditProps<D>) {
       />
     ) : null;
   }, [
+    canUpdate,
     data,
     dataSource,
     error,

@@ -254,4 +254,6 @@ Account.propTypes /* remove-proptypes */ = {
   }),
 } as any;
 
-export { Account };
+const MemoizedAccount = React.memo(Account);
+MemoizedAccount.displayName = 'Account';
+export { MemoizedAccount as Account };

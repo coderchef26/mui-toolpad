@@ -137,4 +137,6 @@ PageContainer.propTypes /* remove-proptypes */ = {
   title: PropTypes.string,
 } as any;
 
-export { PageContainer };
+const MemoizedPageContainer = React.memo(PageContainer);
+MemoizedPageContainer.displayName = 'PageContainer';
+export { MemoizedPageContainer as PageContainer };

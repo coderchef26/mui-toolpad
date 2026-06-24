@@ -144,4 +144,6 @@ PageHeader.propTypes /* remove-proptypes */ = {
   title: PropTypes.string,
 } as any;
 
-export { PageHeader };
+const MemoizedPageHeader = React.memo(PageHeader);
+MemoizedPageHeader.displayName = 'PageHeader';
+export { MemoizedPageHeader as PageHeader };

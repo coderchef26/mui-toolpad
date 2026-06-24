@@ -7,6 +7,9 @@ import { expect, describe, test, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
+import { axe, toHaveNoViolations } from 'vitest-axe';
+
+expect.extend(toHaveNoViolations);
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import FormControl from '@mui/material/FormControl';
@@ -486,5 +489,27 @@ describe('Crud', () => {
     const updatedDataRows = updatedRenderedRows.slice(1);
 
     expect(updatedDataRows).toHaveLength(2);
+  });
+
+  test('list view has no accessibility violations', async () => {
+    const { container } = render(<AppWithRouter initialPath="/orders" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Order 1')).toBeInTheDocument();
+    });
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  test('create form has no accessibility violations', async () => {
+    const { container } = render(<AppWithRouter initialPath="/orders/new" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /title/i })).toBeInTheDocument();
+    });
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

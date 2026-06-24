@@ -6,6 +6,7 @@ import type { DashboardSidebarPageItemContextProps } from '../DashboardLayout/Da
 import type { DataModel } from '../Crud';
 import type { CrudProviderProps } from '../Crud/CrudProvider';
 import type { DataSourceCache } from '../Crud/cache';
+import type { PermissionsContextValue } from './permissions';
 
 export const BrandingContext = React.createContext<Branding | null>(null);
 
@@ -35,3 +36,18 @@ export const CrudContext = React.createContext<{
 });
 
 export const WindowContext = React.createContext<Window | undefined>(undefined);
+
+/**
+ * Provides permission-checking capabilities to the component tree.
+ * The default value always returns `true` so existing apps without a
+ * `permissions` prop on `AppProvider` are completely unaffected.
+ */
+export const PermissionsContext = React.createContext<PermissionsContextValue>({
+  check: () => true,
+});
+
+/**
+ * Pre-filtered navigation (items hidden by permission rules already removed).
+ * Consumed by `DashboardSidebarSubNavigation` instead of the raw `NavigationContext`.
+ */
+export const FilteredNavigationContext = React.createContext<Navigation>([]);

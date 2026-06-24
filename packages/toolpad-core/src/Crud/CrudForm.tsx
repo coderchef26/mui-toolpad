@@ -21,6 +21,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import type { GridSingleSelectColDef } from '@mui/x-data-grid';
 import dayjs, { Dayjs } from 'dayjs';
 import { CrudContext } from '../shared/context';
+import { SessionContext } from '../AppProvider/AppProvider';
+import { sanitizeTextInput } from '../shared/sanitize';
 import type { DataField, DataFieldFormValue, DataModel, DataSource, OmitId } from './types';
 
 interface CrudFormState<D extends DataModel> {
@@ -125,6 +127,8 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
 
   invariant(dataSource, 'No data source found.');
 
+  const session = React.useContext(SessionContext);
+
   const { fields } = dataSource;
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -145,7 +149,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
 
   const handleTextFieldChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      onFieldChange(event.target.name, event.target.value);
+      onFieldChange(event.target.name, sanitizeTextInput(event.target.value));
     },
     [onFieldChange],
   );
@@ -184,7 +188,17 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
 
   const renderField = React.useCallback(
     (formField: DataField) => {
-      const { field, type, headerName, renderFormField } = formField;
+      const { field, type, headerName, renderFormField, visibleIf, disabledIf } = formField;
+
+      // Dynamic visibility — skip field if predicate returns false
+      if (visibleIf && !visibleIf(formValues as Record<string, unknown>, session)) {
+        return null;
+      }
+
+      // Dynamic disabled state
+      const isFieldDisabled = disabledIf
+        ? disabledIf(formValues as Record<string, unknown>, session)
+        : false;
 
       const fieldValue = formValues[field];
       const fieldError = formErrors[field];
@@ -209,6 +223,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
             error={!!fieldError}
             helperText={fieldError ?? ' '}
             fullWidth
+            disabled={isFieldDisabled}
             {...slotProps?.textField}
           />
         );
@@ -225,6 +240,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
             error={!!fieldError}
             helperText={fieldError ?? ' '}
             fullWidth
+            disabled={isFieldDisabled}
             {...slotProps?.textField}
           />
         );
@@ -232,7 +248,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
         const CheckBoxComponent = slots?.checkbox ?? Checkbox;
 
         fieldElement = (
-          <FormControl>
+          <FormControl disabled={isFieldDisabled}>
             <FormControlLabel
               name={field}
               control={
@@ -258,6 +274,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
               onChange={handleDateFieldChange(field)}
               name={field}
               label={headerName}
+              disabled={isFieldDisabled}
               slotProps={{
                 textField: {
                   error: !!fieldError,
@@ -279,6 +296,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
               onChange={handleDateFieldChange(field)}
               name={field}
               label={headerName}
+              disabled={isFieldDisabled}
               slotProps={{
                 textField: {
                   error: !!fieldError,
@@ -300,7 +318,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
           const labelId = `${field}-label`;
 
           fieldElement = (
-            <FormControl error={!!fieldError} fullWidth>
+            <FormControl error={!!fieldError} fullWidth disabled={isFieldDisabled}>
               <InputLabel id={labelId}>{headerName}</InputLabel>
               <SelectComponent
                 value={(fieldValue as string) ?? ''}
@@ -348,6 +366,7 @@ function CrudForm<D extends DataModel>(props: CrudFormProps<D>) {
       handleSelectFieldChange,
       handleTextFieldChange,
       onFieldChange,
+      session,
       slotProps,
       slots,
     ],
@@ -440,4 +459,7 @@ CrudForm.propTypes /* remove-proptypes */ = {
   submitButtonLabel: PropTypes.string.isRequired,
 } as any;
 
-export { CrudForm };
+const MemoizedCrudForm = React.memo(CrudForm) as <D extends DataModel>(
+  props: CrudFormProps<D>,
+) => React.ReactElement | null;
+export { MemoizedCrudForm as CrudForm };

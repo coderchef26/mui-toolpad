@@ -3,16 +3,25 @@ import * as React from 'react';
 import PropTypes from 'prop-types';
 import { match } from 'path-to-regexp';
 import invariant from 'invariant';
+import CircularProgress from '@mui/material/CircularProgress';
+import Box from '@mui/material/Box';
 import { RouterContext } from '../shared/context';
 import { CrudProvider } from './CrudProvider';
 import { List, type ListSlots, ListSlotProps } from './List';
-import { Show } from './Show';
-import { Create } from './Create';
-import { Edit } from './Edit';
+// Lazily import secondary CRUD views to reduce the initial bundle loaded by List
+const Show = React.lazy(() => import('./Show').then((m) => ({ default: m.Show as React.ComponentType<any> })));
+const Create = React.lazy(() => import('./Create').then((m) => ({ default: m.Create as React.ComponentType<any> })));
+const Edit = React.lazy(() => import('./Edit').then((m) => ({ default: m.Edit as React.ComponentType<any> })));
 import { DataSourceCache } from './cache';
 import type { DataModel, DataModelId, DataSource, OmitId } from './types';
 import type { CrudFormSlotProps, CrudFormSlots } from './CrudForm';
 import { type PageContainerProps } from '../PageContainer';
+
+const CrudSuspenseFallback = (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
+    <CircularProgress />
+  </Box>
+);
 
 export interface CrudProps<D extends DataModel> {
   /**
@@ -156,7 +165,7 @@ function Crud<D extends DataModel>(props: CrudProps<D>) {
     }
     if (match(createPath)(pathname)) {
       return (
-        <Create<D>
+        <Create
           initialValues={defaultValues}
           onSubmitSuccess={handleCreate}
           resetOnSubmit={false}
@@ -193,7 +202,7 @@ function Crud<D extends DataModel>(props: CrudProps<D>) {
       const resourceId = showMatch.params.id;
       invariant(resourceId, 'No resource ID present in URL.');
       return (
-        <Show<D>
+        <Show
           id={resourceId}
           onEditClick={handleEditClick}
           onDelete={handleDelete}
@@ -220,7 +229,7 @@ function Crud<D extends DataModel>(props: CrudProps<D>) {
       const resourceId = editMatch.params.id;
       invariant(resourceId, 'No resource ID present in URL.');
       return (
-        <Edit<D>
+        <Edit
           id={resourceId}
           onSubmitSuccess={handleEdit}
           pageTitle={pageTitles?.edit}
@@ -273,7 +282,7 @@ function Crud<D extends DataModel>(props: CrudProps<D>) {
 
   return (
     <CrudProvider<D> dataSource={dataSource} dataSourceCache={dataSourceCache}>
-      {renderedRoute}
+      <React.Suspense fallback={CrudSuspenseFallback}>{renderedRoute}</React.Suspense>
     </CrudProvider>
   );
 }
@@ -357,5 +366,13 @@ Crud.propTypes /* remove-proptypes */ = {
     pageContainer: PropTypes.elementType,
   }),
 } as any;
+
+// Attach compound component references for convenience
+// Usage: <Crud.List />, <Crud.Create />, etc.
+Crud.List = List as unknown as typeof import('./List').List;
+Crud.Create = Create as unknown as typeof import('./Create').Create;
+Crud.Edit = Edit as unknown as typeof import('./Edit').Edit;
+Crud.Show = Show as unknown as typeof import('./Show').Show;
+Crud.Provider = CrudProvider as unknown as typeof CrudProvider;
 
 export { Crud };

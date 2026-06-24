@@ -598,4 +598,6 @@ DashboardLayout.propTypes /* remove-proptypes */ = {
   ]),
 } as any;
 
-export { DashboardLayout };
+const MemoizedDashboardLayout = React.memo(DashboardLayout);
+MemoizedDashboardLayout.displayName = 'DashboardLayout';
+export { MemoizedDashboardLayout as DashboardLayout };

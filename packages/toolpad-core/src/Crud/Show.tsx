@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 import { useDialogs } from '../useDialogs';
 import { useNotifications } from '../useNotifications';
 import { useLocaleText } from '../AppProvider/LocalizationProvider';
-import { CrudContext } from '../shared/context';
+import { CrudContext, PermissionsContext } from '../shared/context';
 import { DataSourceCache } from './cache';
 import { useCachedDataSource } from './useCachedDataSource';
 import type { DataField, DataModel, DataModelId, DataSource } from './types';
@@ -99,6 +99,13 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
   >;
 
   invariant(dataSource, 'No data source found.');
+
+  // Permission checks
+  const { check } = React.useContext(PermissionsContext);
+  const { permissions } = dataSource;
+  const canRead   = permissions?.read   !== undefined ? check(permissions.read)   : true;
+  const canUpdate = permissions?.update !== undefined ? check(permissions.update) : true;
+  const canDelete = permissions?.delete !== undefined ? check(permissions.delete) : true;
 
   const cache = React.useMemo(() => {
     const manualCache = dataSourceCache ?? crudContext.dataSourceCache;
@@ -212,11 +219,21 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
       const fieldValue = data[field];
 
       if (valueFormatter) {
-        return (valueFormatter as (value: unknown, row: D, column: DataField) => string)(
+        const formatted = (valueFormatter as (value: unknown, row: D, column: DataField) => string)(
           fieldValue,
           data,
           showField,
         );
+        if (process.env.NODE_ENV !== 'production' && typeof formatted === 'string') {
+          const lower = formatted.toLowerCase();
+          if (lower.includes('<script') || lower.includes('javascript:')) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[Toolpad] Show: valueFormatter for field "${field}" returned a string that contains a potentially unsafe pattern ("${lower.includes('<script') ? '<script' : 'javascript:'}"). Ensure user-supplied content is properly sanitised before formatting.`,
+            );
+          }
+        }
+        return formatted;
       }
       if (type === 'boolean') {
         return fieldValue ? 'Yes' : 'No';
@@ -260,6 +277,14 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
   );
 
   const renderShow = React.useMemo(() => {
+    if (!canRead) {
+      return (
+        <Box sx={{ flexGrow: 1 }}>
+          <Alert severity="error">{localeText.accessDeniedMessage}</Alert>
+        </Box>
+      );
+    }
+
     if (isLoading) {
       return (
         <Box
@@ -319,12 +344,12 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
         </Grid>
         <Divider sx={{ my: 3 }} />
         <Stack direction="row" spacing={2} justifyContent="flex-end">
-          {onEditClick ? (
+          {onEditClick && canUpdate ? (
             <Button variant="contained" startIcon={<EditIcon />} onClick={handleItemEdit}>
               {localeText.editLabel}
             </Button>
           ) : null}
-          {deleteOne ? (
+          {deleteOne && canDelete ? (
             <Button
               variant="contained"
               color="error"
@@ -338,6 +363,9 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
       </Box>
     ) : null;
   }, [
+    canDelete,
+    canRead,
+    canUpdate,
     data,
     deleteOne,
     error,
@@ -346,6 +374,7 @@ function Show<D extends DataModel>(props: ShowProps<D>) {
     handleItemEdit,
     hasDeleted,
     isLoading,
+    localeText.accessDeniedMessage,
     localeText.deleteLabel,
     localeText.deletedItemMessage,
     localeText.editLabel,

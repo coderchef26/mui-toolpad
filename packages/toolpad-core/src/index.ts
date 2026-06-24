@@ -27,3 +27,13 @@ export * from './useSessionStorageState';
 export * from './persistence/codec';
 
 export * from './locales';
+
+export * from './usePermissions';
+
+export * from './PermissionGuard';
+
+export type { PermissionCheck, CrudPermissions, PermissionsConfig, PermissionsContextValue } from './shared/permissions';
+
+export * from './ChartsWidget';
+
+export * from './useRealtimeDataSource';

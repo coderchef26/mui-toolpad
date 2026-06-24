@@ -53,6 +53,9 @@ const jaLabels: LocaleText = {
   deleteSuccessMessage: 'アイテムが正常に削除されました。',
   deleteErrorMessage: 'アイテムの削除に失敗しました。理由:',
   deletedItemMessage: 'このアイテムは削除されました。',
+
+  // Permissions
+  accessDeniedMessage: 'このリソースにアクセスする権限がありません。',
 };
 
 export default getLocalization(jaLabels);

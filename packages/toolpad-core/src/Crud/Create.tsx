@@ -1,9 +1,11 @@
 'use client';
 import * as React from 'react';
 import PropTypes from 'prop-types';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import invariant from 'invariant';
 import { useNotifications } from '../useNotifications';
-import { CrudContext } from '../shared/context';
+import { CrudContext, PermissionsContext } from '../shared/context';
 import { useLocaleText } from '../AppProvider/LocalizationProvider';
 import { CrudForm, CrudFormSlotProps, CrudFormSlots } from './CrudForm';
 import { DataSourceCache } from './cache';
@@ -95,6 +97,11 @@ function Create<D extends DataModel>(props: CreateProps<D>) {
   const notifications = useNotifications();
 
   invariant(dataSource, 'No data source found.');
+
+  // Permission check — guard create operation
+  const { check } = React.useContext(PermissionsContext);
+  const { permissions } = dataSource;
+  const canCreate = permissions?.create !== undefined ? check(permissions.create) : true;
 
   const cache = React.useMemo(() => {
     const manualCache = dataSourceCache ?? crudContext.dataSourceCache;
@@ -211,6 +218,24 @@ function Create<D extends DataModel>(props: CreateProps<D>) {
   ]);
 
   const PageContainerSlot = slots?.pageContainer ?? PageContainer;
+
+  if (!canCreate) {
+    return (
+      <PageContainerSlot
+        title={pageTitle}
+        breadcrumbs={
+          activePage && pageTitle
+            ? [...activePage.breadcrumbs, { title: pageTitle }]
+            : undefined
+        }
+        {...slotProps?.pageContainer}
+      >
+        <Box sx={{ flexGrow: 1 }}>
+          <Alert severity="error">{localeText.accessDeniedMessage}</Alert>
+        </Box>
+      </PageContainerSlot>
+    );
+  }
 
   return (
     <PageContainerSlot

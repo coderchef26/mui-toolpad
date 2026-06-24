@@ -6,10 +6,14 @@ import { NotificationsProvider } from '../useNotifications';
 import { DialogsProvider } from '../useDialogs';
 import {
   BrandingContext,
+  FilteredNavigationContext,
   NavigationContext,
+  PermissionsContext,
   RouterContext,
   WindowContext,
 } from '../shared/context';
+import type { PermissionsConfig } from '../shared/permissions';
+import { resolvePermissionCheck } from '../shared/permissions';
 import type { LinkProps } from '../shared/Link';
 import { AppThemeProvider } from './AppThemeProvider';
 import { LocalizationProvider, type LocaleText } from './LocalizationProvider';
@@ -46,6 +50,18 @@ export interface NavigationPageItem {
   pattern?: string;
   action?: React.ReactNode;
   children?: Navigation;
+  /**
+   * Permission check for this navigation item.
+   * When the check fails the item is hidden (default) or disabled,
+   * depending on `unauthorizedBehavior`.
+   */
+  permissions?: import('../shared/permissions').PermissionCheck;
+  /**
+   * What to do when the user lacks permission for this nav item.
+   * - `'hide'` (default) — remove the item from the sidebar entirely.
+   * - `'disable'` — render the item but visually disabled.
+   */
+  unauthorizedBehavior?: 'hide' | 'disable';
 }
 
 export interface NavigationSubheaderItem {
@@ -67,6 +83,11 @@ export interface Session {
     name?: string | null;
     image?: string | null;
     email?: string | null;
+    /**
+     * Roles assigned to the current user. Used by string-array `PermissionCheck`
+     * values to evaluate whether the user is authorised for an operation.
+     */
+    roles?: string[];
   };
 }
 
@@ -130,6 +151,13 @@ export interface AppProviderProps {
    * The nonce to be used for inline scripts.
    */
   nonce?: string;
+  /**
+   * Permissions configuration for the application.
+   * When omitted, all permission checks default to `true` (fully open access),
+   * preserving backward compatibility for existing apps.
+   * @default undefined
+   */
+  permissions?: PermissionsConfig;
 }
 
 function createDefaultTheme(): Theme {
@@ -164,7 +192,57 @@ function AppProvider(props: AppProviderProps) {
     session = null,
     window: appWindow,
     nonce,
+    permissions,
   } = props;
+
+  // Derive stable PermissionsContextValue from the current session + config.
+  const permissionsContextValue = React.useMemo(() => {
+    const resolver = permissions?.resolver;
+    return {
+      check: (permission: import('../shared/permissions').PermissionCheck) =>
+        resolvePermissionCheck(permission, session, resolver),
+      getCsrfToken: permissions?.getCsrfToken,
+    };
+  }, [permissions, session]);
+
+  // Pre-filter navigation items by permission so sidebar components don't need to.
+  const filteredNavigation = React.useMemo(() => {
+    type PageItem = import('../AppProvider').NavigationPageItem & {
+      permissions?: import('../shared/permissions').PermissionCheck;
+      unauthorizedBehavior?: 'hide' | 'disable';
+    };
+
+    const filterItems = (
+      items: import('../AppProvider').Navigation,
+    ): import('../AppProvider').Navigation =>
+      items.reduce<import('../AppProvider').Navigation>((acc, item) => {
+        if (item.kind === 'header' || item.kind === 'divider') {
+          acc.push(item);
+          return acc;
+        }
+
+        const pageItem = item as PageItem;
+        const permCheck = pageItem.permissions;
+        const behaviour = pageItem.unauthorizedBehavior ?? 'hide';
+
+        if (permCheck !== undefined && !permissionsContextValue.check(permCheck)) {
+          if (behaviour === 'disable') {
+            // Keep the item but mark it disabled via a special internal flag
+            acc.push({ ...pageItem, _disabled: true } as import('../AppProvider').NavigationPageItem);
+          }
+          // 'hide' (default) — skip entirely
+          return acc;
+        }
+
+        const filtered = pageItem.children
+          ? { ...pageItem, children: filterItems(pageItem.children) }
+          : pageItem;
+        acc.push(filtered);
+        return acc;
+      }, []);
+
+    return filterItems(navigation);
+  }, [navigation, permissionsContextValue]);
 
   return (
     <WindowContext.Provider value={appWindow}>
@@ -177,7 +255,11 @@ function AppProvider(props: AppProviderProps) {
                   <DialogsProvider>
                     <BrandingContext.Provider value={branding}>
                       <NavigationContext.Provider value={navigation}>
-                        {children}
+                        <FilteredNavigationContext.Provider value={filteredNavigation}>
+                          <PermissionsContext.Provider value={permissionsContextValue}>
+                            {children}
+                          </PermissionsContext.Provider>
+                        </FilteredNavigationContext.Provider>
                       </NavigationContext.Provider>
                     </BrandingContext.Provider>
                   </DialogsProvider>

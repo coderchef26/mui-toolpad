@@ -1,0 +1,8 @@
+[
+  {
+    "name": "@toolpad/core — main bundle",
+    "path": "build/index.js",
+    "limit": "120 kB",
+    "gzip": true
+  }
+]

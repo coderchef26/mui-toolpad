@@ -18,6 +18,7 @@ export type CRUDLocaleText = Pick<
   | 'deleteSuccessMessage'
   | 'deleteErrorMessage'
   | 'deletedItemMessage'
+  | 'accessDeniedMessage'
 >;
 
 export const CRUD_DEFAULT_LOCALE_TEXT: CRUDLocaleText = {
@@ -37,4 +38,5 @@ export const CRUD_DEFAULT_LOCALE_TEXT: CRUDLocaleText = {
   deleteSuccessMessage: 'Item deleted successfully.',
   deleteErrorMessage: 'Failed to delete item. Reason:',
   deletedItemMessage: 'This item has been deleted.',
+  accessDeniedMessage: 'You do not have permission to access this resource.',
 };

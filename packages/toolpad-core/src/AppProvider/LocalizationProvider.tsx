@@ -55,6 +55,9 @@ export interface LocaleText {
   deleteSuccessMessage: string;
   deleteErrorMessage: string;
   deletedItemMessage: string;
+
+  // Permissions
+  accessDeniedMessage: string;
 }
 
 export interface LocalizationProviderProps {

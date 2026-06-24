@@ -18,6 +18,7 @@ import {
   GridSortModel,
   GridEventListener,
   gridClasses,
+  GridRowId,
 } from '@mui/x-data-grid';
 import type { DataGridProProps } from '@mui/x-data-grid-pro';
 import type { DataGridPremiumProps } from '@mui/x-data-grid-premium';
@@ -29,7 +30,7 @@ import invariant from 'invariant';
 import { useDialogs } from '../useDialogs';
 import { useNotifications } from '../useNotifications';
 import { NoSsr } from '../shared/NoSsr';
-import { CrudContext, RouterContext } from '../shared/context';
+import { CrudContext, PermissionsContext, RouterContext } from '../shared/context';
 import { useLocaleText } from '../AppProvider/LocalizationProvider';
 import { DataSourceCache } from './cache';
 import { useCachedDataSource } from './useCachedDataSource';
@@ -103,6 +104,26 @@ export interface ListProps<D extends DataModel> {
    * Locale text for the component.
    */
   localeText?: CRUDLocaleText;
+  /**
+   * When `true`, enables checkbox selection and a "Delete selected" toolbar button.
+   * Requires `dataSource.deleteMany` or `dataSource.deleteOne` to be defined.
+   * @default false
+   */
+  enableBatchOperations?: boolean;
+  /**
+   * Custom action buttons rendered in each row's actions column.
+   * Each entry receives the row `id` and returns a React node.
+   */
+  rowActions?: Array<{
+    label: string;
+    icon?: React.ReactNode;
+    onClick: (id: DataModelId) => void;
+  }>;
+  /**
+   * When `true`, adds a CSV export button to the toolbar via `GridToolbarExport`.
+   * @default false
+   */
+  enableExport?: boolean;
 }
 
 /**
@@ -127,6 +148,9 @@ function List<D extends DataModel>(props: ListProps<D>) {
     slots,
     slotProps,
     localeText: propsLocaleText,
+    enableBatchOperations = false,
+    rowActions,
+    enableExport = false,
   } = props;
 
   const globalLocaleText = useLocaleText();
@@ -149,6 +173,17 @@ function List<D extends DataModel>(props: ListProps<D>) {
 
   const { fields, validate, ...methods } = cachedDataSource;
   const { getMany, deleteOne } = methods;
+  const { deleteMany } = dataSource;
+
+  // Batch selection state (only active when enableBatchOperations is true)
+  const [selectedIds, setSelectedIds] = React.useState<Set<GridRowId>>(new Set());
+
+  // Permission checks — default to `true` when no permissions config is set (backward-compatible)
+  const { check } = React.useContext(PermissionsContext);
+  const { permissions } = dataSource;
+  const canRead   = permissions?.read   !== undefined ? check(permissions.read)   : true;
+  const canCreate = permissions?.create !== undefined ? check(permissions.create) : true;
+  const canDelete = permissions?.delete !== undefined ? check(permissions.delete) : true;
 
   const routerContext = React.useContext(RouterContext);
 
@@ -377,6 +412,55 @@ function List<D extends DataModel>(props: ListProps<D>) {
     ],
   );
 
+  const handleBatchDelete = React.useCallback(async () => {
+    if (selectedIds.size === 0) {
+      return;
+    }
+    const confirmed = await dialogs.confirm(localeText.deleteConfirmMessage, {
+      title: localeText.deleteConfirmTitle,
+      severity: 'error',
+      okText: localeText.deleteConfirmLabel,
+      cancelText: localeText.deleteCancelLabel,
+    });
+
+    if (confirmed) {
+      setIsLoading(true);
+      try {
+        const ids = Array.from(selectedIds) as DataModelId[];
+        if (deleteMany) {
+          await deleteMany(ids);
+        } else if (deleteOne) {
+          await Promise.all(ids.map((id) => deleteOne(id)));
+        }
+        setSelectedIds(new Set());
+        notifications.show(localeText.deleteSuccessMessage, {
+          severity: 'success',
+          autoHideDuration: 3000,
+        });
+        loadData();
+      } catch (batchDeleteError) {
+        notifications.show(
+          `${localeText.deleteErrorMessage} ${(batchDeleteError as Error).message}`,
+          { severity: 'error', autoHideDuration: 3000 },
+        );
+      }
+      setIsLoading(false);
+    }
+  }, [
+    deleteMany,
+    deleteOne,
+    dialogs,
+    loadData,
+    localeText.deleteCancelLabel,
+    localeText.deleteConfirmLabel,
+    localeText.deleteConfirmMessage,
+    localeText.deleteConfirmTitle,
+    localeText.deleteErrorMessage,
+    localeText.deleteSuccessMessage,
+    notifications,
+    selectedIds,
+  ]);
+
   const DataGridSlot = slots?.dataGrid ?? DataGrid;
   const PageContainerSlot = slots?.pageContainer ?? PageContainer;
 
@@ -415,7 +499,7 @@ function List<D extends DataModel>(props: ListProps<D>) {
                 />,
               ]
             : []),
-          ...(deleteOne
+          ...(deleteOne && canDelete
             ? [
                 <GridActionsCellItem
                   key="delete-item"
@@ -425,10 +509,30 @@ function List<D extends DataModel>(props: ListProps<D>) {
                 />,
               ]
             : []),
+          ...(rowActions
+            ? rowActions.map((action, idx) =>
+                action.icon ? (
+                  <GridActionsCellItem
+                    key={`row-action-${idx}`}
+                    icon={action.icon as React.ReactElement}
+                    label={action.label}
+                    onClick={() => action.onClick(id)}
+                  />
+                ) : (
+                  <GridActionsCellItem
+                    key={`row-action-${idx}`}
+                    showInMenu
+                    label={action.label}
+                    onClick={() => action.onClick(id)}
+                  />
+                ),
+              )
+            : []),
         ],
       },
     ];
   }, [
+    canDelete,
     deleteOne,
     fields,
     handleItemDelete,
@@ -436,8 +540,28 @@ function List<D extends DataModel>(props: ListProps<D>) {
     localeText.deleteLabel,
     localeText.editLabel,
     onEditClick,
+    rowActions,
     slotProps?.dataGrid,
   ]);
+
+  if (!canRead) {
+    const PageContainerDenied = slots?.pageContainer ?? PageContainer;
+    return (
+      <PageContainerDenied
+        title={pageTitle}
+        breadcrumbs={
+          activePage && pageTitle
+            ? [...activePage.breadcrumbs, { title: pageTitle }]
+            : undefined
+        }
+        {...slotProps?.pageContainer}
+      >
+        <Box sx={{ flexGrow: 1 }}>
+          <Alert severity="error">{localeText.accessDeniedMessage}</Alert>
+        </Box>
+      </PageContainerDenied>
+    );
+  }
 
   return (
     <PageContainerSlot
@@ -474,11 +598,23 @@ function List<D extends DataModel>(props: ListProps<D>) {
                   </IconButton>
                 </div>
               </Tooltip>
-              {onCreateClick ? (
-                <Button variant="contained" onClick={onCreateClick} startIcon={<AddIcon />}>
-                  {localeText.createNewButtonLabel}
-                </Button>
-              ) : null}
+              <Stack direction="row" spacing={1}>
+                {enableBatchOperations && selectedIds.size > 0 && (canDelete || deleteMany) ? (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleBatchDelete}
+                    startIcon={<DeleteIcon />}
+                  >
+                    {localeText.deleteLabel} ({selectedIds.size})
+                  </Button>
+                ) : null}
+                {onCreateClick && canCreate ? (
+                  <Button variant="contained" onClick={onCreateClick} startIcon={<AddIcon />}>
+                    {localeText.createNewButtonLabel}
+                  </Button>
+                ) : null}
+              </Stack>
             </Stack>
             {/* Use NoSsr to prevent issue https://github.com/mui/mui-x/issues/17077 as DataGrid has no SSR support */}
             <NoSsr>
@@ -496,11 +632,25 @@ function List<D extends DataModel>(props: ListProps<D>) {
                 onSortModelChange={handleSortModelChange}
                 filterModel={filterModel}
                 onFilterModelChange={handleFilterModelChange}
+                checkboxSelection={enableBatchOperations}
+                rowSelectionModel={
+                  enableBatchOperations
+                    ? { type: 'include' as const, ids: selectedIds }
+                    : undefined
+                }
+                onRowSelectionModelChange={
+                  enableBatchOperations
+                    ? (model) => setSelectedIds(model.ids)
+                    : undefined
+                }
                 disableRowSelectionOnClick
                 onRowClick={handleRowClick}
                 loading={isLoading}
                 initialState={initialState}
                 slots={{ toolbar: GridToolbar }}
+                slotProps={{
+                  toolbar: enableExport ? {} : { csvOptions: { disableToolbarButton: true }, printOptions: { disableToolbarButton: true } },
+                }}
                 // Prevent type conflicts if slotProps don't match DataGrid used for dataGrid slot
                 {...(slotProps?.dataGrid as Record<string, unknown>)}
                 sx={{
@@ -595,4 +745,8 @@ List.propTypes /* remove-proptypes */ = {
   }),
 } as any;
 
-export { List };
+// Generic memo pattern — preserves the generic type parameter
+const MemoizedList = React.memo(List) as <D extends DataModel>(
+  props: ListProps<D>,
+) => React.ReactElement | null;
+export { MemoizedList as List };

@@ -38,7 +38,9 @@
     "test": "vitest run --coverage",
     "test:dev": "vitest",
     "test:browser": "vitest run -c vitest.config.browser.mts",
-    "test:browser:dev": "vitest -c vitest.config.browser.mts"
+    "test:browser:dev": "vitest -c vitest.config.browser.mts",
+    "bench": "vitest bench",
+    "size": "size-limit"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.6",
@@ -53,6 +55,7 @@
     "prop-types": "15.8.1"
   },
   "devDependencies": {
+    "@axe-core/react": "^4.10.2",
     "@emotion/cache": "11.14.0",
     "@emotion/react": "11.14.0",
     "@mui/icons-material": "^7.2.0",
@@ -73,13 +76,17 @@
     "playwright": "1.54.1",
     "react-router": "7.6.3",
     "sinon": "^21.0.0",
-    "vitest": "2.1.9"
+    "vitest": "2.1.9",
+    "vitest-axe": "^0.1.0",
+    "size-limit": "^11.0.0",
+    "@size-limit/preset-big-lib": "^11.0.0"
   },
   "peerDependencies": {
     "@emotion/cache": "^11",
     "@emotion/react": "^11",
     "@mui/icons-material": "^7.0.0-beta || ^7.0.0",
     "@mui/material": "^7.0.0-beta || ^7.0.0",
+    "@mui/x-charts": "^8.0.0",
     "@tanstack/react-router": "^1",
     "next": "^14 || ^15",
     "react": "^18 || ^19",
@@ -87,6 +94,9 @@
     "react-router": "^7"
   },
   "peerDependenciesMeta": {
+    "@mui/x-charts": {
+      "optional": true
+    },
     "next": {
       "optional": true
     },

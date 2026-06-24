@@ -53,6 +53,9 @@ const enLabels: LocaleText = {
   deleteSuccessMessage: 'Item deleted successfully.',
   deleteErrorMessage: 'Failed to delete item. Reason:',
   deletedItemMessage: 'This item has been deleted.',
+
+  // Permissions
+  accessDeniedMessage: 'You do not have permission to access this resource.',
 };
 
 export default getLocalization(enLabels);
